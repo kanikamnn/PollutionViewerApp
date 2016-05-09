@@ -13,6 +13,8 @@ import android.widget.Toast;
 import com.codeGeekerz.project.pollutionTracker.adapter.ExpandableListAdapter;
 import com.codeGeekerz.project.pollutionTracker.utils.ApplicationUIUtils;
 import com.codeGeekerz.project.pollutionTracker.utils.SessionManager;
+import com.codeGeekerz.project.pollutionTracker.utils.StationMap;
+import com.google.gson.Gson;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -98,21 +100,22 @@ public class DisplayStatesOptionsActivity extends BaseActivity {
                         if (!list_cities.contains(stateFullList.getCityName())) {
                             list_cities.add(stateFullList.getCityName());
                             station_Names = new ArrayList<>();
-                            station_Names.add(stateFullList.getStationName());
-                            station_names_map.put(stateFullList.getStationName(), stateFullList.getFullStationName());
+                            station_Names.add(stateFullList.getFullStationName());
+                            station_names_map.put(stateFullList.getFullStationName(), stateFullList.getStationName());
                             listStationChild.put(stateFullList.getCityName(), station_Names);
                         } else {
                             listStationChild.put(stateFullList.getCityName(), station_Names);
                         }
-                        if (!station_Names.contains(stateFullList.getStationName())) {
-                            station_Names.add(stateFullList.getStationName());
-                            station_names_map.put(stateFullList.getStationName(), stateFullList.getFullStationName());
+                        if (!station_Names.contains(stateFullList.getFullStationName())) {
+                            station_Names.add(stateFullList.getFullStationName());
+                            station_names_map.put(stateFullList.getFullStationName(), stateFullList.getStationName());
                         }
                     }
+                    setStationsMap(station_names_map);
                     setUpStateList(listDataHeader, listDataChild, listStationChild);
-                }else{
+                } else {
                     try {
-                        Log.i(TAG, "error is :"+response.errorBody().string());
+                        Log.i(TAG, "error is :" + response.errorBody().string());
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -127,6 +130,15 @@ public class DisplayStatesOptionsActivity extends BaseActivity {
         });
     }
 
+    private void setStationsMap(HashMap<String, String> station_names_map) {
+        Gson gson = new Gson();
+        StationMap wrapper = new StationMap();
+        wrapper.setMyMap(station_names_map);
+        String serializedMap = gson.toJson(wrapper);
+// add 'serializedMap' to preferences
+        session.setStationsMap(serializedMap);
+    }
+
     private void setUpStateList(final List<String> listDataHeader, final HashMap<String, List<String>> listDataChild, final HashMap<String, List<String>> listStationChild) {
         // get the listview
         states_List = (ExpandableListView) findViewById(R.id.list_states);
@@ -136,20 +148,11 @@ public class DisplayStatesOptionsActivity extends BaseActivity {
         states_List.setOnChildClickListener(new ExpandableListView.OnChildClickListener() {
             @Override
             public boolean onChildClick(ExpandableListView parent, View view, int groupPosition, int childPosition, long id) {
-                /*Toast.makeText(
-                        getApplicationContext(),
-                        listDataHeader.get(groupPosition)
-                                + " : "
-                                + listDataChild.get(
-                                listDataHeader.get(groupPosition)).get(
-                                childPosition), Toast.LENGTH_SHORT)
-                        .show();*/
                 Intent intent = new Intent(DisplayStatesOptionsActivity.this, StationDisplayActivity.class);
                 List<String> stations = listStationChild.get(listDataChild.get(
                         listDataHeader.get(groupPosition)).get(
                         childPosition));
                 intent.putStringArrayListExtra("stations", (ArrayList<String>) stations);
-                intent.putExtra("station_names_map", station_names_map);
                 startActivityForResult(intent, PICK_STATION_REQUEST);
                 return false;
             }
@@ -161,7 +164,6 @@ public class DisplayStatesOptionsActivity extends BaseActivity {
         if (resultCode == Activity.RESULT_OK && requestCode == PICK_STATION_REQUEST) {
             Intent output = new Intent();
             output.putExtra("stationName", resultData.getStringExtra("stationName"));
-            output.putExtra("stationFullName", resultData.getStringExtra("stationFullName"));
             setResult(RESULT_OK, output);
             finish();
         }

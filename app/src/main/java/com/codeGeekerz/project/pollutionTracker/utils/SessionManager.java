@@ -25,6 +25,7 @@ public class SessionManager {
 
     // All Shared Preferences Keys
     private static final String IS_LOGIN = "IsLoggedIn";
+    private static final String STATION_MAP = "stationsMap";
     SharedPreferences pref;
     // Editor for Shared preferences
     SharedPreferences.Editor editor;
@@ -59,8 +60,10 @@ public class SessionManager {
         editor.commit();
     }
 
-    public void setSessionStateList(HashSet<String> stations, String token) {
+    public void setSessionStateList(HashSet<String> stations, String token, String stationsMap) {
         editor.clear();
+        //storing stationsMap in pref
+        editor.putString(STATION_MAP, stationsMap);
         // Storing token in pref
         editor.putString(TOKEN, token);
         // Storing station name in pref
@@ -78,6 +81,15 @@ public class SessionManager {
 
     public String getToken() {
         return pref.getString(TOKEN, "");
+    }
+
+    public String getStationsMap() {
+        return pref.getString(STATION_MAP, "");
+    }
+
+    public void setStationsMap(String stationsMap) {
+        editor.putString(STATION_MAP, stationsMap);
+        editor.apply();
     }
 
     /**

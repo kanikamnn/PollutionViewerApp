@@ -32,6 +32,7 @@ import com.codeGeekerz.project.pollutionTracker.adapter.MyRecyclerViewAdapter;
 import com.codeGeekerz.project.pollutionTracker.utils.ApplicationUIUtils;
 import com.codeGeekerz.project.pollutionTracker.utils.DataObject;
 import com.codeGeekerz.project.pollutionTracker.utils.SessionManager;
+import com.codeGeekerz.project.pollutionTracker.utils.StationMap;
 import com.codeGeekerz.project.pollutionTracker.utils.SwipeableRecyclerViewTouchListener;
 import com.crashlytics.android.Crashlytics;
 import com.google.android.gms.common.ConnectionResult;
@@ -39,6 +40,7 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -165,7 +167,7 @@ public class MenuDisplayActivity extends BaseActivity
                                     mAdapter.notifyItemRemoved(position);
                                     selectedStations = session.getStationsList();
                                     selectedStations.remove(d.getmText1());
-                                    session.setSessionStateList(selectedStations, session.getToken());
+                                    session.setSessionStateList(selectedStations, session.getToken(), session.getStationsMap());
                                 }
                                 mAdapter.notifyDataSetChanged();
                             }
@@ -178,7 +180,7 @@ public class MenuDisplayActivity extends BaseActivity
                                     mAdapter.notifyItemRemoved(position);
                                     selectedStations = session.getStationsList();
                                     selectedStations.remove(d.getmText1());
-                                    session.setSessionStateList(selectedStations, session.getToken());
+                                    session.setSessionStateList(selectedStations, session.getToken(), session.getStationsMap());
                                 }
                                 mAdapter.notifyDataSetChanged();
                             }
@@ -275,6 +277,9 @@ public class MenuDisplayActivity extends BaseActivity
             checkForPermissionGranted();
             return;
         } else {
+            if (!mGoogleApiClient.isConnected()) {
+                mGoogleApiClient.connect();
+            }
             mLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
             if (mLocation != null) {
                 handleNewLocation(mLocation, false);
@@ -291,7 +296,9 @@ public class MenuDisplayActivity extends BaseActivity
                 Iterator<String> itr = user_station.iterator();
                 while (itr.hasNext()) {
                     String stationName = itr.next();
-                    callForPollutionData(stationName, "", false, false);
+                    String serializedMap = session.getStationsMap();
+                    HashMap<String, String> stationsMap = deserializeMap(serializedMap);
+                    callForPollutionData(stationsMap.get(stationName), stationName, false, false);
                 }
             }
             hideProgressDialog();
@@ -403,12 +410,16 @@ public class MenuDisplayActivity extends BaseActivity
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent resultData) {
         if (resultCode == Activity.RESULT_OK && requestCode == PICK_STATION_REQUEST) {
-            String stationName = resultData.getStringExtra("stationName");
-            callForPollutionData(stationName, "", false, false);
+            String stationFullName = resultData.getStringExtra("stationName");
+            String serializedMap = session.getStationsMap();
+            if (!serializedMap.isEmpty()) {
+                HashMap<String, String> stationsMap = deserializeMap(serializedMap);
+                callForPollutionData(stationsMap.get(stationFullName), stationFullName, false, false);
+            }
             mAdapter.notifyDataSetChanged();
             selectedStations = session.getStationsList();
-            selectedStations.add(stationName);
-            session.setSessionStateList(selectedStations, session.getToken());
+            selectedStations.add(stationFullName);
+            session.setSessionStateList(selectedStations, session.getToken(), serializedMap);
         }
     }
 
@@ -432,10 +443,15 @@ public class MenuDisplayActivity extends BaseActivity
                     } else {
                         if (nearestStation != null) {
                             stationName = nearestStation.getStationName();
+                        } else {
+                            ApplicationUIUtils.showAlertDialog(MenuDisplayActivity.this, "", "Sorry! No data Available", false);
+                            return;
                         }
                     }
                     Intent intent = new Intent(MenuDisplayActivity.this, PollutionDetailActivity.class);
-                    intent.putExtra("pollutionDetail", stationPollutionDetailHashMap.get(stationName));
+                    String serializedMap = session.getStationsMap();
+                    HashMap<String, String> map = deserializeMap(serializedMap);
+                    intent.putExtra("pollutionDetail", stationPollutionDetailHashMap.get(map.get(stationName)));
                     startActivity(intent);
                 }
             });
@@ -492,13 +508,16 @@ public class MenuDisplayActivity extends BaseActivity
                         //get backGround Color of card according to AQI value
                         int color = ApplicationUIUtils.getCardBackgroundColor(MenuDisplayActivity.this, pollutionData.getAqi());
                         String text3 = ApplicationUIUtils.getPollutionStatus(MenuDisplayActivity.this, pollutionData.getAqi());
-                        DataObject d = new DataObject(firstCard ? "Your Nearest Pollution Station is : " + stationFullName : stationName, text2, text3, color);
+                        DataObject d = new DataObject(firstCard ? "Your Nearest Pollution Station is : " + stationFullName : stationFullName, text2, text3, color);
                         if (firstCard) {
-                            mAdapter.addItem(d, 0);
                             if (isFromLocationUpdate) {
+                                mAdapter.deleteItem(0);
+                                mAdapter.addItem(d, 0);
                                 mAdapter.notifyItemChanged(0);
+                            } else {
+                                mAdapter.addItem(d, 0);
+                                mAdapter.notifyDataSetChanged();
                             }
-                            mAdapter.notifyDataSetChanged();
                         } else {
                             int count = mAdapter.getItemCount();
                             mAdapter.addItem(d, count);
@@ -522,5 +541,12 @@ public class MenuDisplayActivity extends BaseActivity
     @Override
     public void onLocationChanged(Location location) {
         handleNewLocation(location, true);
+    }
+
+    private HashMap<String, String> deserializeMap(String serializedMap) {
+        Gson gson = new Gson();
+        StationMap map = gson.fromJson(serializedMap, StationMap.class);
+        HashMap<String, String> stationsMap = map.getMyMap();
+        return stationsMap;
     }
 }

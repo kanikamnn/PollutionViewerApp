@@ -14,10 +14,8 @@ import android.widget.Toast;
 import com.codeGeekerz.project.pollutionTracker.utils.ApplicationUIUtils;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 
 public class StationDisplayActivity extends BaseActivity {
-    private HashMap<String, String> station_names_map;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,7 +27,6 @@ public class StationDisplayActivity extends BaseActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
         ArrayList<String> stations = getIntent().getStringArrayListExtra("stations");
-        station_names_map = (HashMap<String, String>) getIntent().getSerializableExtra("station_names_map");
         if (!stations.isEmpty() && ApplicationUIUtils.isNetworkAvailable(this)) {
             showProgressBar(this, "Downloading Content...");
             setCityListView(stations);
@@ -58,7 +55,6 @@ public class StationDisplayActivity extends BaseActivity {
                 Intent intent = new Intent(StationDisplayActivity.this, MenuDisplayActivity.class);
                 String stationName = (String) parent.getItemAtPosition(position);
                 intent.putExtra("stationName", stationName);
-                intent.putExtra("stationFullName", station_names_map.get(stationName));
                 setResult(RESULT_OK, intent);
                 finish();
             }
