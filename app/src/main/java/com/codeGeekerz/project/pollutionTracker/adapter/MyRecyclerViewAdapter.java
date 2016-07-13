@@ -48,7 +48,7 @@ public class MyRecyclerViewAdapter extends RecyclerView.Adapter<MyRecyclerViewAd
         holder.dateTime.setText(mDataset.get(position).getmText2());
         holder.dateTime.setTextSize(25);
         holder.card.setCardBackgroundColor(mDataset.get(position).getmColor());
-        if (!mDataset.get(position).getmText3().isEmpty()) {
+        if (position != 0 && !mDataset.get(position).getmText3().isEmpty()) {
             holder.pollutionBoard.setText(mDataset.get(position).getmText3());
             holder.pollutionBoard.setTextSize(15);
             holder.pollutionBoard.setBackgroundColor(Color.BLACK);

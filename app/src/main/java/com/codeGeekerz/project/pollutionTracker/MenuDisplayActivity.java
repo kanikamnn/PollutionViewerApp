@@ -207,7 +207,9 @@ public class MenuDisplayActivity extends BaseActivity
     @Override
     public void onStart() {
         super.onStart();
-        mGoogleApiClient.connect();
+        if(mGoogleApiClient!=null && !mGoogleApiClient.isConnected()) {
+            mGoogleApiClient.connect();
+        }
     }
 
     @Override
@@ -302,8 +304,10 @@ public class MenuDisplayActivity extends BaseActivity
                 while (itr.hasNext()) {
                     String stationName = itr.next();
                     String serializedMap = session.getStationsMap();
-                    HashMap<String, String> stationsMap = deserializeMap(serializedMap);
-                    callForPollutionData(stationsMap.get(stationName), stationName, false, false);
+                    if (!serializedMap.isEmpty()) {
+                        HashMap<String, String> stationsMap = deserializeMap(serializedMap);
+                        callForPollutionData(stationsMap.get(stationName), stationName, false, false);
+                    }
                 }
             }
             hideProgressDialog();
@@ -446,7 +450,12 @@ public class MenuDisplayActivity extends BaseActivity
                 @Override
                 public void onItemClick(int position, View v) {
                     if (position != 0) {
-                        stationName = results.get(position).getmText1();
+                        String station = results.get(position).getmText1();
+                        String serializedMap = session.getStationsMap();
+                        if (!serializedMap.isEmpty()) {
+                            HashMap<String, String> map = deserializeMap(serializedMap);
+                            stationName = map.get(station);
+                        }
                     } else {
                         if (nearestStation != null) {
                             stationName = nearestStation.getStationName();
@@ -456,10 +465,9 @@ public class MenuDisplayActivity extends BaseActivity
                         }
                     }
                     Intent intent = new Intent(MenuDisplayActivity.this, PollutionDetailActivity.class);
-                    String serializedMap = session.getStationsMap();
-                    HashMap<String, String> map = deserializeMap(serializedMap);
-                    intent.putExtra("pollutionDetail", stationPollutionDetailHashMap.get(map.get(stationName)));
+                    intent.putExtra("pollutionDetail", stationPollutionDetailHashMap.get(stationName));
                     startActivity(intent);
+
                 }
             });
         }
