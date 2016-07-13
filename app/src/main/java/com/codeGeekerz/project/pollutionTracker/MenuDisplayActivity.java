@@ -59,13 +59,13 @@ public class MenuDisplayActivity extends BaseActivity
 
     private static final String TAG = "userCurrentLocation";
     private static final int PICK_STATION_REQUEST = 0;
-    private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
+    private static final int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
     private final int REQUEST_CODE_ASK_PERMISSIONS = 1;
     private final ArrayList<DataObject> results = new ArrayList<>();
-    StationPollutionDetail pollutionData = null;
-    Location mLocation;
-    LocationManager locManager = null;
-    Double mLatitude, mLongitude;
+    private StationPollutionDetail pollutionData = null;
+    private Location mLocation;
+    private LocationManager locManager = null;
+    private Double mLatitude, mLongitude;
     private HashMap<String, StationPollutionDetail> stationPollutionDetailHashMap = new HashMap<>();
     private GoogleApiClient mGoogleApiClient;
     private RecyclerView mRecyclerView;
@@ -77,6 +77,7 @@ public class MenuDisplayActivity extends BaseActivity
     private HashSet<String> selectedStations = new HashSet<>();
     private String token;
     private LocationRequest mLocationRequest;
+    private boolean fetchedFirstCard = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -201,9 +202,13 @@ public class MenuDisplayActivity extends BaseActivity
                 .addOnConnectionFailedListener(this)
                 .addApi(LocationServices.API)
                 .build();
-        mGoogleApiClient.connect();
     }
 
+    @Override
+    public void onStart() {
+        super.onStart();
+        mGoogleApiClient.connect();
+    }
 
     @Override
     public void onBackPressed() {
@@ -263,13 +268,16 @@ public class MenuDisplayActivity extends BaseActivity
     public void onStop() {
         super.onStop();
         if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
+            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
             mGoogleApiClient.disconnect();
         }
     }
 
     @Override
     public void onConnected(Bundle bundle) {
-        createFirstCard();
+        if (!fetchedFirstCard) {
+            createFirstCard();
+        }
     }
 
     private void createFirstCard() {
@@ -277,18 +285,15 @@ public class MenuDisplayActivity extends BaseActivity
             checkForPermissionGranted();
             return;
         } else {
-            if (!mGoogleApiClient.isConnected()) {
-                mGoogleApiClient.connect();
-            }
-            mLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-            if (mLocation != null) {
-                handleNewLocation(mLocation, false);
-            } else {
-                if (!mGoogleApiClient.isConnected()) {
-                    mGoogleApiClient.connect();
+            fetchedFirstCard = true;
+            if (mGoogleApiClient.isConnected()) {
+                mLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+                if (mLocation != null) {
+                    handleNewLocation(mLocation, false);
+                } else {
+                    LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+                    callForPollutionData("Sorry No Nearest Area Found", "", true, false);
                 }
-                LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-                callForPollutionData("Sorry No Nearest Area Found", "", true, false);
             }
             if (session.getStationsList() != null && !session.getStationsList().isEmpty() && !session.getToken().isEmpty()) {
                 Log.i(TAG, "Token is" + session.getToken());
@@ -306,8 +311,9 @@ public class MenuDisplayActivity extends BaseActivity
     }
 
     private void handleNewLocation(Location mLocation, final boolean isFromLocationUpdate) {
-        mLatitude = mLocation.getLatitude();
-        mLongitude = mLocation.getLongitude();
+        if (ApplicationUIUtils.isNetworkAvailable(this)) {
+            mLatitude = mLocation.getLatitude();
+            mLongitude = mLocation.getLongitude();
             /*if (mGoogleApiClient.isConnected() && mLocation != null) {
                 mResultReceiver = new AddressResultReceiver(new Handler());
                 mResultReceiver.setReceiver(this);
@@ -316,27 +322,30 @@ public class MenuDisplayActivity extends BaseActivity
                 intent.putExtra(Constants.LOCATION_DATA_EXTRA, mLocation);
                 startService(intent);
             }*/
-        //calling API to get nearest station area
-        APIService apiService = APIHelper.getApiService();
-        Call<AllStation> nearestStationCall = apiService.findNearestStation(mLatitude, mLongitude);
-        nearestStationCall.enqueue(new Callback<AllStation>() {
-            @Override
-            public void onResponse(Response<AllStation> response) {
-                if (response.isSuccess()) {
-                    nearestStation = response.body();
-                    if (nearestStation != null && !session.getToken().isEmpty()) {
-                        callForPollutionData(nearestStation.getStationName(), nearestStation.getFullStationName(), true, isFromLocationUpdate);
-                    } else {
-                        callForPollutionData("Sorry No Nearest Area Found", "", true, isFromLocationUpdate);
+            //calling API to get nearest station area
+            APIService apiService = APIHelper.getApiService();
+            Call<AllStation> nearestStationCall = apiService.findNearestStation(mLatitude, mLongitude);
+            nearestStationCall.enqueue(new Callback<AllStation>() {
+                @Override
+                public void onResponse(Response<AllStation> response) {
+                    if (response.isSuccess()) {
+                        nearestStation = response.body();
+                        if (nearestStation != null && !session.getToken().isEmpty()) {
+                            callForPollutionData(nearestStation.getStationName(), nearestStation.getFullStationName(), true, isFromLocationUpdate);
+                        } else {
+                            callForPollutionData("Sorry No Nearest Area Found", "", true, isFromLocationUpdate);
+                        }
                     }
                 }
-            }
 
-            @Override
-            public void onFailure(Throwable t) {
-                ApplicationUIUtils.showAlertDialog(MenuDisplayActivity.this, "Error", "A Problem has occured! Please retry", false);
-            }
-        });
+                @Override
+                public void onFailure(Throwable t) {
+                    ApplicationUIUtils.showAlertDialog(MenuDisplayActivity.this, "Error", "A Problem has occured! Please retry", false);
+                }
+            });
+        } else {
+            ApplicationUIUtils.showAlertDialog(this, "Internet Connection Error", "Please connect to Internet and Retry", false);
+        }
     }
 
     private void checkForPermissionGranted() {
@@ -373,7 +382,7 @@ public class MenuDisplayActivity extends BaseActivity
                                            int[] grantResults) {
         switch (requestCode) {
             case REQUEST_CODE_ASK_PERMISSIONS:
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     // Permission Granted
                     createFirstCard();
                 } else {
@@ -426,10 +435,8 @@ public class MenuDisplayActivity extends BaseActivity
     @Override
     protected void onResume() {
         super.onResume();
-        if (mGoogleApiClient == null) {
-            if (ApplicationUIUtils.isNetworkAvailable(this)) {
-                buildGoogleApiClient(MenuDisplayActivity.this);
-            }
+        if (mGoogleApiClient == null && ApplicationUIUtils.isNetworkAvailable(this)) {
+            buildGoogleApiClient(MenuDisplayActivity.this);
         }
         if (mAdapter != null) {
             mAdapter.setOnItemClickListener(new MyRecyclerViewAdapter
@@ -461,10 +468,6 @@ public class MenuDisplayActivity extends BaseActivity
     @Override
     protected void onPause() {
         super.onPause();
-        if (mGoogleApiClient != null && mGoogleApiClient.isConnected()) {
-            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
-            mGoogleApiClient.disconnect();
-        }
     }
 
     @Override

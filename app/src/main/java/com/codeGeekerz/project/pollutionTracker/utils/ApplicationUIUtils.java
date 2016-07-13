@@ -19,11 +19,37 @@ import java.math.RoundingMode;
  */
 public class ApplicationUIUtils {
 
+    public static int TYPE_WIFI = 1;
+    public static int TYPE_MOBILE = 2;
+    public static int TYPE_NOT_CONNECTED = 0;
+
+    public static int getConnectivityStatus(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context
+                .getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        if (null != activeNetwork) {
+            if (activeNetwork.getType() == ConnectivityManager.TYPE_WIFI)
+                return TYPE_WIFI;
+
+            if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE)
+                return TYPE_MOBILE;
+        }
+        return TYPE_NOT_CONNECTED;
+    }
+
     //Method to check if network is available or not
-    public static boolean isNetworkAvailable(Context ctx) {
-        ConnectivityManager connectivityManager = (ConnectivityManager) ctx.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
-        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    public static boolean isNetworkAvailable(Context context) {
+        int conn = ApplicationUIUtils.getConnectivityStatus(context);
+        boolean status = false;
+        if (conn == ApplicationUIUtils.TYPE_WIFI) {
+            status = true;
+        } else if (conn == ApplicationUIUtils.TYPE_MOBILE) {
+            status = true;
+        } else if (conn == ApplicationUIUtils.TYPE_NOT_CONNECTED) {
+            status = false;
+        }
+        return status;
     }
 
     //Method to check if GPS enable or disable
